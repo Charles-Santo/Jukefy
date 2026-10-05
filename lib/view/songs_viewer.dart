@@ -1,3 +1,4 @@
+import 'package:Jukefy/view/add_artist.dart';
 import 'package:flutter/material.dart';
 import 'package:Jukefy/view/add_song.dart';
 import 'package:Jukefy/database/song_dao.dart';
@@ -57,6 +58,7 @@ class _SongsViewerState extends State<SongsViewer> {
                     },
                   ),
                 ),
+                Expanded(child: OptionCard(title: 'Add Artist', subtitle: 'Register your favorite Artist', icon: Icons.emoji_people_sharp, onTap: () async { await Navigator.push(context, MaterialPageRoute(builder: (context) => const AddArtist(),),);}))
               ],
             ),
           ),
