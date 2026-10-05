@@ -20,6 +20,7 @@ class DatabaseHelper {
       version: _version,
       onConfigure: _onConfigure,
       onCreate: _createDb,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -43,6 +44,7 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         artisticName TEXT NOT NULL,
+        description TEXT,
         imagePath TEXT NOT NULL
       )
     ''');
@@ -80,5 +82,11 @@ class DatabaseHelper {
         FOREIGN KEY (songId) REFERENCES songs (id) ON DELETE CASCADE
       )
     ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE artists ADD COLUMN description TEXT;');
+    }
   }
 }

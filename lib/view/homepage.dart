@@ -29,7 +29,7 @@ class _HomepageState extends State<Homepage> {
  
       appBar: AppBar(
         title: Text(
-          'Owari',
+          'Jukefy',
           style: TextStyle(
             color: Theme.of(context).colorScheme.onPrimary,
             fontWeight: FontWeight.bold,

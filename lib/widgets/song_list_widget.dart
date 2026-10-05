@@ -126,7 +126,7 @@ class _SongListWidgetState extends State<SongListWidget> {
             ),
             subtitle: Row(
               children: [
-                Expanded(child: Text("${song.artist} • ${song.genre} • ${song.duration}s")),
+                Expanded(child: Text("${song.idArtist} • ${song.duration}s")),
               ],
             ),
 

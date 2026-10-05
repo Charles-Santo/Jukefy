@@ -3,13 +3,11 @@ class Song {
   final String title;
   final String audioPath;
   final String imagePath;
-  final String idArtist;
-  
+  final int idArtist; // Alterado para int
   final int duration;
-  bool isFavorite; 
-  
-  
-  Song({ 
+  bool isFavorite;
+
+  Song({
     this.id,
     required this.title,
     required this.idArtist,
@@ -25,7 +23,7 @@ class Song {
       title: map['title'] as String,
       audioPath: map['audioPath'] as String,
       imagePath: map['imagePath'] as String,
-      idArtist: map['artist'] as String,
+      idArtist: map['idArtist'] as int,
       duration: map['durationInSeconds'] as int,
       isFavorite: map['isFavorite'] == 1,
     );
