@@ -1,3 +1,5 @@
+import 'package:Jukefy/view/artists_viewer.dart';
+import 'package:Jukefy/view/favorite_songs.dart';
 import 'package:flutter/material.dart';
 import 'package:Jukefy/view/library.dart';
 import 'package:Jukefy/view/songs_viewer.dart';
@@ -89,10 +91,17 @@ class ConteudoHome extends StatelessWidget {
               Expanded(
                 child: OptionCard(
                   
-                  title: 'Playing now',
-                  subtitle: 'Your queue',
+                  title: 'Artists',
+                  subtitle: 'Your Artists',
                   icon: Icons.music_video,
-                  onTap: () {},
+                  onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ArtistsViewer(),
+                        ),
+                      );
+                    },
                 ),
               ),
               const SizedBox(width: 12),
@@ -114,7 +123,14 @@ class ConteudoHome extends StatelessWidget {
             title: 'Your Favorites',
             subtitle: 'Aura Farm',
             icon: Icons.star,
-            onTap: () {},
+            onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const FavoriteSongs(),
+                        ),
+                      );
+                    },
           ),
         ],
       );

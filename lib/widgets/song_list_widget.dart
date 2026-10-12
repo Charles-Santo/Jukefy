@@ -2,7 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:Jukefy/database/song_dao.dart';
+import 'package:Jukefy/database/artist_dao.dart';
 import '../model/song.dart';
+import '../model/artist.dart';
 import '../view/add_song.dart';
 
 class SongListWidget extends StatefulWidget {
@@ -32,6 +34,13 @@ class _SongListWidgetState extends State<SongListWidget> {
   void dispose() {
     _audioPlayer.dispose();
     super.dispose();
+  }
+
+  String _formatarDuracao(int segundosTotais) {
+    int minutos = segundosTotais ~/ 60;
+    int segundos = segundosTotais % 60;
+    String segundosStr = segundos.toString().padLeft(2, '0');
+    return "$minutos:$segundosStr";
   }
 
   Widget _construirImagemCapa(String path) {
@@ -124,12 +133,24 @@ class _SongListWidgetState extends State<SongListWidget> {
                 ),
               ],
             ),
-            subtitle: Row(
-              children: [
-                Expanded(child: Text("${song.idArtist} • ${song.duration}s")),
-              ],
-            ),
+            subtitle: FutureBuilder<Artist?>(
+              future: ArtistDao.instance.getById(song.idArtist),
+              builder: (context, artistSnapshot) {
+                String nomeArtista = "Carregando...";
+                if (artistSnapshot.connectionState == ConnectionState.done) {
+                  if (artistSnapshot.hasData && artistSnapshot.data != null) {
+                    nomeArtista = artistSnapshot.data!.artisticName;
+                  } else {
+                    nomeArtista = "Artista desconhecido";
+                  }
+                }
+                
+                // Formatando a duração aqui com a nova função
+                String duracaoFormatada = _formatarDuracao(song.duration);
 
+                return Text("$nomeArtista • $duracaoFormatada");
+              },
+            ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

@@ -3,7 +3,7 @@ class Song {
   final String title;
   final String audioPath;
   final String imagePath;
-  final int idArtist; // Alterado para int
+  final int idArtist;
   final int duration;
   bool isFavorite;
 

@@ -12,7 +12,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Jukefy',
       theme: ThemeData(
-        colorScheme: .fromSeed(seedColor: const Color.fromARGB(255, 255, 206, 239)),
+        colorScheme: .fromSeed(seedColor: const Color.fromARGB(255, 255, 175, 224)),
       ),
       home: const Homepage(),
     );

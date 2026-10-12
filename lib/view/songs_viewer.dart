@@ -19,10 +19,10 @@ class _SongsViewerState extends State<SongsViewer> {
   @override
   void initState() {
     super.initState();
-    _loadSongs();
+    _carregarMusicas();
   }
 
-  Future<void> _loadSongs() async {
+  Future<void> _carregarMusicas() async {
     final songs = await SongDao.instance.getSongs();
     setState(() {
       _songs = songs;
@@ -54,11 +54,25 @@ class _SongsViewerState extends State<SongsViewer> {
                           builder: (context) => const AddSong(),
                         ),
                       );
-                      _loadSongs();
+                      _carregarMusicas();
                     },
                   ),
                 ),
-                Expanded(child: OptionCard(title: 'Add Artist', subtitle: 'Register your favorite Artist', icon: Icons.emoji_people_sharp, onTap: () async { await Navigator.push(context, MaterialPageRoute(builder: (context) => const AddArtist(),),);}))
+                Expanded(
+                  child: OptionCard(
+                    title: 'Add Artist',
+                    subtitle: 'Register your favorite Artist',
+                    icon: Icons.emoji_people_sharp,
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AddArtist(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ],
             ),
           ),
@@ -67,8 +81,8 @@ class _SongsViewerState extends State<SongsViewer> {
               songs: _songs,
               showEditButton: true,
               showDeleteButton: true,
-              onSongUpdated: _loadSongs,
-              onSongDeleted: _loadSongs,
+              onSongUpdated: _carregarMusicas,
+              onSongDeleted: _carregarMusicas,
             ),
           ),
         ],
