@@ -1,8 +1,9 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:Jukefy/model/artist.dart';
 import 'package:Jukefy/model/song.dart';
 import 'package:Jukefy/database/song_dao.dart';
+import 'package:Jukefy/widgets/app_image.dart';
+import 'package:Jukefy/widgets/mini_player.dart';
 import 'package:Jukefy/widgets/song_list_widget.dart';
 
 class ArtistDescription extends StatefulWidget {
@@ -27,33 +28,6 @@ class _ArtistDescriptionState extends State<ArtistDescription> {
     _songsFuture = SongDao.instance.getByArtist(widget.artist.id!);
   }
 
-  Widget _construirImagemArtista(String path) {
-    if (path.isEmpty) {
-      return Container(
-        width: 140,
-        height: 140,
-        decoration: BoxDecoration(
-          color: Colors.grey[800],
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(Icons.person, size: 70, color: Colors.white),
-      );
-    }
-
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return CircleAvatar(
-        radius: 70,
-        backgroundImage: NetworkImage(path),
-        onBackgroundImageError: (_, __) {},
-      );
-    } else {
-      return CircleAvatar(
-        radius: 70,
-        backgroundImage: FileImage(File(path)),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -65,8 +39,11 @@ class _ArtistDescriptionState extends State<ArtistDescription> {
         children: [
           const SizedBox(height: 20),
           Center(
-            child: ClipOval(
-              child: _construirImagemArtista(widget.artist.imagePath),
+            child: AppImage(
+              path: widget.artist.imagePath,
+              size: 140,
+              circular: true,
+              icon: Icons.person,
             ),
           ),
           const SizedBox(height: 16),
@@ -119,7 +96,9 @@ class _ArtistDescriptionState extends State<ArtistDescription> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 } else if (snapshot.hasError) {
-                  return Center(child: Text("Erro ao carregar músicas: ${snapshot.error}"));
+                  return Center(
+                    child: Text("Erro ao carregar músicas: ${snapshot.error}"),
+                  );
                 } else if (!snapshot.hasData) {
                   return const Center(child: Text("Nenhuma música encontrada."));
                 }
@@ -140,12 +119,14 @@ class _ArtistDescriptionState extends State<ArtistDescription> {
                       _carregarMusicasDoArtista();
                     });
                   },
+                  onFavoriteChanged: () {},
                 );
               },
             ),
           ),
         ],
       ),
+      bottomNavigationBar: const MiniPlayer(useSafeArea: true),
     );
   }
 }

@@ -5,6 +5,8 @@ import '../model/song.dart';
 import '../model/artist.dart';
 import '../database/song_dao.dart';
 import '../database/artist_dao.dart';
+import '../services/file_service.dart';
+import 'add_artist.dart';
 
 class AddSong extends StatefulWidget {
   final Song? song;
@@ -27,6 +29,7 @@ class _AddSongState extends State<AddSong> {
 
   List<Artist> _artists = [];
   bool _isLoadingArtists = true;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -46,11 +49,13 @@ class _AddSongState extends State<AddSong> {
   Future<void> _loadArtists() async {
     try {
       final list = await ArtistDao.instance.getAll();
+      if (!mounted) return;
       setState(() {
         _artists = list;
         _isLoadingArtists = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoadingArtists = false;
       });
@@ -81,23 +86,96 @@ class _AddSongState extends State<AddSong> {
 
       setState(() {
         _audioPath = caminhoEscolhido;
+        _durationInSeconds = 0;
       });
 
+      // Se o título ainda está vazio, sugere o nome do arquivo.
+      if (_titleController.text.trim().isEmpty) {
+        final nome = caminhoEscolhido.split('/').last;
+        final semExtensao =
+            nome.contains('.') ? nome.substring(0, nome.lastIndexOf('.')) : nome;
+        _titleController.text = semExtensao;
+      }
+
+      final player = AudioPlayer();
       try {
-        final player = AudioPlayer();
         await player.setSourceDeviceFile(caminhoEscolhido);
         Duration? duracao = await player.getDuration();
 
-        if (duracao != null) {
+        if (duracao != null && mounted) {
           setState(() {
             _durationInSeconds = duracao.inSeconds;
           });
         }
-
-        await player.dispose();
       } catch (e) {
         debugPrint('Erro ao obter a duração: $e');
+      } finally {
+        await player.dispose();
       }
+    }
+  }
+
+  Future<void> _novoArtista() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddArtist()),
+    );
+    await _loadArtists();
+  }
+
+  Future<void> _salvar() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    if (_audioPath == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Por favor, selecione um arquivo de áudio!")),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      // Só copia para a pasta do app o que foi trocado nesta edição.
+      String audio = _audioPath!;
+      if (audio != widget.song?.audioPath) {
+        audio = await FileService.persist(audio, 'songs');
+      }
+
+      String image = _imagePathController.text.trim();
+      if (image != widget.song?.imagePath) {
+        image = await FileService.persist(image, 'covers');
+      }
+
+      Song song = Song(
+        id: widget.song?.id,
+        title: _titleController.text.trim(),
+        idArtist: _selectedArtistId!,
+        duration: _durationInSeconds,
+        audioPath: audio,
+        imagePath: image,
+        isFavorite: _isFavorite,
+      );
+
+      if (widget.song == null) {
+        await SongDao.instance.add(song);
+      } else {
+        await SongDao.instance.update(song);
+      }
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Song salvo com sucesso!")),
+      );
+
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Erro ao salvar: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -131,30 +209,58 @@ class _AddSongState extends State<AddSong> {
                         },
                       ),
                       const SizedBox(height: 10),
-
-                      DropdownButtonFormField<int>(
-                        value: _selectedArtistId,
-                        decoration: const InputDecoration(labelText: "Artista"),
-                        items: _artists.map((artist) {
-                          return DropdownMenuItem<int>(
-                            value: artist.id,
-                            child: Text(artist.artisticName),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedArtistId = value;
-                          });
-                        },
-                        validator: (value) {
-                          if (value == null) {
-                            return 'Selecione um artista';
-                          }
-                          return null;
-                        },
-                      ),
+                      if (_artists.isEmpty)
+                        Card(
+                          child: ListTile(
+                            leading: const Icon(Icons.info_outline),
+                            title: const Text(
+                              'Nenhum artista cadastrado. Cadastre um artista para continuar.',
+                            ),
+                            trailing: TextButton(
+                              onPressed: _novoArtista,
+                              child: const Text('Novo artista'),
+                            ),
+                          ),
+                        )
+                      else
+                        Row(
+                          children: [
+                            Expanded(
+                              child: DropdownButtonFormField<int>(
+                                value: _selectedArtistId,
+                                isExpanded: true,
+                                decoration:
+                                    const InputDecoration(labelText: "Artista"),
+                                items: _artists.map((artist) {
+                                  return DropdownMenuItem<int>(
+                                    value: artist.id,
+                                    child: Text(
+                                      artist.artisticName,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _selectedArtistId = value;
+                                  });
+                                },
+                                validator: (value) {
+                                  if (value == null) {
+                                    return 'Selecione um artista';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.person_add),
+                              tooltip: 'Novo artista',
+                              onPressed: _novoArtista,
+                            ),
+                          ],
+                        ),
                       const SizedBox(height: 15),
-
                       Row(
                         children: [
                           ElevatedButton.icon(
@@ -176,22 +282,26 @@ class _AddSongState extends State<AddSong> {
                           ),
                         ],
                       ),
+                      if (_audioPath != null && _durationInSeconds == 0)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 6),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Não foi possível ler a duração deste arquivo.',
+                              style: TextStyle(color: Colors.orange),
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 10),
-
                       Row(
                         children: [
                           Expanded(
                             child: TextFormField(
                               controller: _imagePathController,
                               decoration: const InputDecoration(
-                                labelText: "Caminho da Capa (URL ou Local)",
+                                labelText: "Capa (opcional - URL ou Local)",
                               ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Informe ou selecione a capa';
-                                }
-                                return null;
-                              },
                             ),
                           ),
                           IconButton(
@@ -208,7 +318,6 @@ class _AddSongState extends State<AddSong> {
                         ],
                       ),
                       const SizedBox(height: 10),
-
                       SwitchListTile(
                         title: const Text("Favoritar música?"),
                         value: _isFavorite,
@@ -219,49 +328,16 @@ class _AddSongState extends State<AddSong> {
                         },
                       ),
                       const SizedBox(height: 20),
-
                       ElevatedButton(
-                        onPressed: () async {
-                          if (_formKey.currentState!.validate()) {
-                            if (_audioPath == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    "Por favor, selecione um arquivo de áudio!",
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-
-                            Song song = Song(
-                              id: widget.song?.id,
-                              title: _titleController.text,
-                              idArtist: _selectedArtistId!,
-                              duration: _durationInSeconds,
-                              audioPath: _audioPath!,
-                              imagePath: _imagePathController.text,
-                              isFavorite: _isFavorite,
-                            );
-
-                            if (widget.song == null) {
-                              await SongDao.instance.add(song);
-                            } else {
-                              await SongDao.instance.update(song);
-                            }
-
-                            if (!context.mounted) return;
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text("Song salvo com sucesso!"),
-                              ),
-                            );
-
-                            Navigator.pop(context);
-                          }
-                        },
-                        child: const Text("Salvar"),
+                        onPressed: (_saving || _artists.isEmpty) ? null : _salvar,
+                        child: _saving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text("Salvar"),
                       ),
                     ],
                   ),

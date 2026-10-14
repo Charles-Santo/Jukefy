@@ -23,6 +23,25 @@ class ArtistDao {
     return null;
   }
 
+  /// Retorna o id do "Artista desconhecido", criando-o se necessário.
+  /// Usado nas músicas importadas do armazenamento, que ainda não têm artista.
+  Future<int> getOrCreateUnknown() async {
+    Database db = await DatabaseHelper.instance.database;
+    var result = await db.query(
+      'artists',
+      where: 'artisticName = ?',
+      whereArgs: [DatabaseHelper.unknownArtistName],
+      limit: 1,
+    );
+    if (result.isNotEmpty) return result.first['id'] as int;
+    return await db.insert('artists', {
+      'name': DatabaseHelper.unknownArtistName,
+      'artisticName': DatabaseHelper.unknownArtistName,
+      'description': '',
+      'imagePath': '',
+    });
+  }
+
   Future<int> add(Artist artist) async {
     Database db = await DatabaseHelper.instance.database;
     return await db.insert('artists', artist.toMap());

@@ -1,11 +1,15 @@
-import 'dart:io';
-import 'package:Jukefy/view/artist_description.dart';
 import 'package:flutter/material.dart';
-import 'package:Jukefy/database/artist_dao.dart';
-import '../model/artist.dart';
-import '../view/add_artist.dart';
 
-class ArtistListWidget extends StatefulWidget {
+import 'package:Jukefy/database/artist_dao.dart';
+import 'package:Jukefy/database/song_dao.dart';
+import 'package:Jukefy/model/artist.dart';
+import 'package:Jukefy/services/player_service.dart';
+import 'package:Jukefy/view/add_artist.dart';
+import 'package:Jukefy/view/artist_description.dart';
+import 'package:Jukefy/widgets/app_image.dart';
+import 'package:Jukefy/widgets/confirm_dialog.dart';
+
+class ArtistListWidget extends StatelessWidget {
   final List<Artist> artists;
   final bool showEditButton;
   final bool showDeleteButton;
@@ -21,52 +25,27 @@ class ArtistListWidget extends StatefulWidget {
     this.onArtistDeleted,
   });
 
-  @override
-  State<ArtistListWidget> createState() => _ArtistListWidgetState();
-}
-
-class _ArtistListWidgetState extends State<ArtistListWidget> {
-  Widget _construirImagemArtista(String path) {
-    if (path.isEmpty) {
-      return Container(
-        width: 55,
-        height: 55,
-        color: Colors.grey[800],
-        child: const Icon(Icons.person, color: Colors.white),
-      );
-    }
-
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return Image.network(
-        path,
-        width: 55,
-        height: 55,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _iconeErro(),
-      );
-    } else {
-      return Image.file(
-        File(path),
-        width: 55,
-        height: 55,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _iconeErro(),
-      );
-    }
-  }
-
-  Widget _iconeErro() {
-    return Container(
-      width: 55,
-      height: 55,
-      color: Colors.grey[800],
-      child: const Icon(Icons.broken_image, color: Colors.white),
+  Future<void> _delete(BuildContext context, Artist artist) async {
+    final confirmed = await confirmDialog(
+      context,
+      title: 'Excluir artista',
+      message:
+          'Deseja excluir "${artist.artisticName}"? Todas as músicas desse artista também serão excluídas.',
     );
+    if (!confirmed || artist.id == null) return;
+
+    // Tira da fila de reprodução as músicas que serão apagadas em cascata.
+    final songs = await SongDao.instance.getByArtist(artist.id!);
+    await PlayerService.instance
+        .removeSongsById(songs.where((s) => s.id != null).map((s) => s.id!));
+
+    await ArtistDao.instance.remove(artist);
+    onArtistDeleted?.call();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.artists.isEmpty) {
+    if (artists.isEmpty) {
       return const Center(
         child: Text(
           "Nenhum artista encontrado.",
@@ -78,18 +57,19 @@ class _ArtistListWidgetState extends State<ArtistListWidget> {
 
     return ListView.builder(
       padding: const EdgeInsets.all(8.0),
-      itemCount: widget.artists.length,
+      itemCount: artists.length,
       itemBuilder: (context, index) {
-        final artist = widget.artists[index];
+        final artist = artists[index];
 
         return Card(
           elevation: 2,
           margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
           child: ListTile(
             contentPadding: const EdgeInsets.all(8.0),
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(8.0),
-              child: _construirImagemArtista(artist.imagePath),
+            leading: AppImage(
+              path: artist.imagePath,
+              size: 55,
+              icon: Icons.person,
             ),
             title: Text(
               artist.artisticName,
@@ -104,30 +84,23 @@ class _ArtistListWidgetState extends State<ArtistListWidget> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (widget.showEditButton)
+                if (showEditButton)
                   IconButton(
                     icon: const Icon(Icons.edit, color: Colors.blue),
                     onPressed: () async {
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => AddArtist(artist: artist),
+                          builder: (_) => AddArtist(artist: artist),
                         ),
                       );
-                      if (widget.onArtistUpdated != null) {
-                        widget.onArtistUpdated!();
-                      }
+                      onArtistUpdated?.call();
                     },
                   ),
-                if (widget.showDeleteButton)
+                if (showDeleteButton)
                   IconButton(
                     icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () async {
-                      await ArtistDao.instance.remove(artist);
-                      if (widget.onArtistDeleted != null) {
-                        widget.onArtistDeleted!();
-                      }
-                    },
+                    onPressed: () => _delete(context, artist),
                   ),
               ],
             ),
@@ -135,13 +108,10 @@ class _ArtistListWidgetState extends State<ArtistListWidget> {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ArtistDescription(artist: artist),
+                  builder: (_) => ArtistDescription(artist: artist),
                 ),
               );
-
-              if (widget.onArtistUpdated != null) {
-                widget.onArtistUpdated!();
-              }
+              onArtistUpdated?.call();
             },
           ),
         );

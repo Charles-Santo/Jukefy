@@ -7,8 +7,9 @@ class DatabaseHelper {
 
   static Database? _database;
 
-  static const int _version = 2;
+  static const int _version = 3;
   static const String _dbName = 'owari_db.db';
+  static const String unknownArtistName = 'Artista desconhecido';
 
   Future<Database> get database async => _database ??= await _initDatabase();
 
@@ -29,8 +30,14 @@ class DatabaseHelper {
   }
 
   Future<void> _createDb(Database db, int version) async {
+    await _createTables(db);
+  }
+
+  /// Usa IF NOT EXISTS para servir tanto no onCreate quanto na migração
+  /// de bancos criados pela versão anterior do app.
+  Future<void> _createTables(Database db) async {
     await db.execute('''
-      CREATE TABLE users(
+      CREATE TABLE IF NOT EXISTS users(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
@@ -40,7 +47,7 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
-      CREATE TABLE artists(
+      CREATE TABLE IF NOT EXISTS artists(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         artisticName TEXT NOT NULL,
@@ -50,7 +57,7 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
-      CREATE TABLE songs(
+      CREATE TABLE IF NOT EXISTS songs(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         audioPath TEXT NOT NULL,
@@ -63,7 +70,7 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
-      CREATE TABLE playlists(
+      CREATE TABLE IF NOT EXISTS playlists(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         description TEXT,
@@ -74,7 +81,7 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
-      CREATE TABLE playlist_songs(
+      CREATE TABLE IF NOT EXISTS playlist_songs(
         playlistId INTEGER NOT NULL,
         songId INTEGER NOT NULL,
         PRIMARY KEY (playlistId, songId),
@@ -84,9 +91,64 @@ class DatabaseHelper {
     ''');
   }
 
+  Future<bool> _hasColumn(Database db, String table, String column) async {
+    final info = await db.rawQuery('PRAGMA table_info($table)');
+    return info.any((c) => c['name'] == column);
+  }
+
+  Future<void> _addColumnIfMissing(
+    Database db,
+    String table,
+    String column,
+    String definition,
+  ) async {
+    if (!await _hasColumn(db, table, column)) {
+      await db.execute('ALTER TABLE $table ADD COLUMN $column $definition');
+    }
+  }
+
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 3) {
-      await db.execute('ALTER TABLE artists ADD COLUMN description TEXT;');
+    // Cria as tabelas que ainda não existiam (users, artists, playlists...).
+    await _createTables(db);
+
+    // Garante as colunas das tabelas artists e songs em bancos antigos.
+    await _addColumnIfMissing(db, 'artists', 'description', 'TEXT');
+    await _addColumnIfMissing(db, 'songs', 'title', "TEXT NOT NULL DEFAULT ''");
+    await _addColumnIfMissing(
+        db, 'songs', 'audioPath', "TEXT NOT NULL DEFAULT ''");
+    await _addColumnIfMissing(
+        db, 'songs', 'imagePath', "TEXT NOT NULL DEFAULT ''");
+    await _addColumnIfMissing(db, 'songs', 'idArtist', 'INTEGER');
+    await _addColumnIfMissing(
+        db, 'songs', 'durationInSeconds', 'INTEGER NOT NULL DEFAULT 0');
+    await _addColumnIfMissing(
+        db, 'songs', 'isFavorite', 'INTEGER NOT NULL DEFAULT 0');
+
+    // Músicas antigas não tinham artista: associa a um "Artista desconhecido".
+    final orphans = Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM songs WHERE idArtist IS NULL'),
+        ) ??
+        0;
+    if (orphans > 0) {
+      final existing = await db.query(
+        'artists',
+        where: 'artisticName = ?',
+        whereArgs: [unknownArtistName],
+        limit: 1,
+      );
+      final int artistId = existing.isNotEmpty
+          ? existing.first['id'] as int
+          : await db.insert('artists', {
+              'name': unknownArtistName,
+              'artisticName': unknownArtistName,
+              'description': '',
+              'imagePath': '',
+            });
+      await db.update(
+        'songs',
+        {'idArtist': artistId},
+        where: 'idArtist IS NULL',
+      );
     }
   }
 }

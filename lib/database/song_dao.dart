@@ -48,6 +48,28 @@ class SongDao {
         : [];
   }
 
+  /// Busca músicas já cadastradas por título, nome artístico ou nome do artista.
+  Future<List<Song>> search(String query) async {
+    Database db = await DatabaseHelper.instance.database;
+    final like = '%${query.trim()}%';
+    var result = await db.rawQuery('''
+      SELECT s.* FROM songs s
+      LEFT JOIN artists a ON a.id = s.idArtist
+      WHERE s.title LIKE ? OR a.artisticName LIKE ? OR a.name LIKE ?
+      ORDER BY s.title ASC
+    ''', [like, like, like]);
+    return result.isNotEmpty
+        ? result.map((item) => Song.fromMap(item)).toList()
+        : [];
+  }
+
+  /// Todos os caminhos de áudio já cadastrados (evita importar duplicatas).
+  Future<Set<String>> getAllAudioPaths() async {
+    Database db = await DatabaseHelper.instance.database;
+    var result = await db.query('songs', columns: ['audioPath']);
+    return result.map((row) => row['audioPath'] as String).toSet();
+  }
+
   Future<int> add(Song newSong) async {
     Database db = await DatabaseHelper.instance.database;
     return await db.insert('songs', newSong.toMap());

@@ -21,12 +21,27 @@ class UserDao {
     return null;
   }
 
-  Future<User?> login(String email, String password) async {
+  Future<User?> getByEmail(String email) async {
+    Database db = await DatabaseHelper.instance.database;
+    var result = await db.query(
+      'users',
+      where: 'email = ?',
+      whereArgs: [email],
+      limit: 1,
+    );
+    if (result.isNotEmpty) {
+      return User.fromMap(result.first);
+    }
+    return null;
+  }
+
+  /// [passwordHash] deve ser o hash da senha (veja AuthService.hashPassword).
+  Future<User?> login(String email, String passwordHash) async {
     Database db = await DatabaseHelper.instance.database;
     var result = await db.query(
       'users',
       where: 'email = ? AND password = ?',
-      whereArgs: [email, password],
+      whereArgs: [email, passwordHash],
     );
     if (result.isNotEmpty) {
       return User.fromMap(result.first);
