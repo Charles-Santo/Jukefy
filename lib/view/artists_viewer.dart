@@ -22,7 +22,7 @@ class _ArtistViewerState extends State<ArtistsViewer> {
   }
 
   void _carregarArtistas() {
-    _artistsFuture = ArtistDao.instance.getAll(); 
+    _artistsFuture = ArtistDao.instance.getAll();
   }
 
   @override
@@ -62,7 +62,9 @@ class _ArtistViewerState extends State<ArtistsViewer> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 } else if (snapshot.hasError) {
-                  return Center(child: Text("Erro ao carregar: ${snapshot.error}"));
+                  return Center(
+                    child: Text("Erro ao carregar: ${snapshot.error}"),
+                  );
                 } else if (!snapshot.hasData) {
                   return const Center(child: Text("Nenhum dado encontrado."));
                 }
@@ -70,18 +72,20 @@ class _ArtistViewerState extends State<ArtistsViewer> {
                 final artists = snapshot.data!;
 
                 if (artists.isEmpty) {
-                  return const Center(child: Text("Nenhum artista cadastrado."));
+                  return const Center(
+                    child: Text("Nenhum artista cadastrado."),
+                  );
                 }
 
                 return ArtistListWidget(
                   artists: artists,
-                  showDeleteButton: true, 
-                  showEditButton: true, 
+                  showDeleteButton: true,
+                  showEditButton: true,
                   onArtistDeleted: () {
                     setState(() {
                       _carregarArtistas();
                     });
-                  }, 
+                  },
                   onArtistUpdated: () {
                     setState(() {
                       _carregarArtistas();

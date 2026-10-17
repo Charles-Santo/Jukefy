@@ -1,11 +1,19 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+
 import 'package:audioplayers/audioplayers.dart';
-import 'package:Jukefy/database/song_dao.dart';
+import 'package:flutter/material.dart';
+
+import 'package:Jukefy/audio.dart';
 import 'package:Jukefy/database/artist_dao.dart';
-import '../model/song.dart';
-import '../model/artist.dart';
-import '../view/add_song.dart';
+import 'package:Jukefy/database/playlist_song_dao.dart';
+import 'package:Jukefy/database/song_dao.dart';
+import 'package:Jukefy/model/song.dart';
+import 'package:Jukefy/view/add_song.dart';
+import 'package:Jukefy/widgets/add_to_playlist_sheet.dart';
+import 'package:Jukefy/widgets/app_image.dart';
+import 'package:Jukefy/widgets/confirm_dialog.dart';
+
+enum _SongAction { addToPlaylist, removeFromPlaylist, edit, delete }
 
 class SongListWidget extends StatefulWidget {
   final List<Song> songs;
@@ -13,6 +21,14 @@ class SongListWidget extends StatefulWidget {
   final bool showDeleteButton;
   final VoidCallback? onSongUpdated;
   final VoidCallback? onSongDeleted;
+  final VoidCallback? onFavoriteChanged;
+
+  final int? playlistId;
+  final VoidCallback? onRemovedFromPlaylist;
+
+  final void Function(int index)? onSongTap;
+
+  final int? playingSongId;
 
   const SongListWidget({
     super.key,
@@ -21,6 +37,11 @@ class SongListWidget extends StatefulWidget {
     this.showDeleteButton = false,
     this.onSongUpdated,
     this.onSongDeleted,
+    this.onFavoriteChanged,
+    this.playlistId,
+    this.onRemovedFromPlaylist,
+    this.onSongTap,
+    this.playingSongId,
   });
 
   @override
@@ -28,57 +49,139 @@ class SongListWidget extends StatefulWidget {
 }
 
 class _SongListWidgetState extends State<SongListWidget> {
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  Map<int, String> _artistNames = {};
 
   @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _loadArtistNames();
+  }
+
+  @override
+  void didUpdateWidget(covariant SongListWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.songs, widget.songs)) {
+      _loadArtistNames();
+    }
+  }
+
+  Future<void> _loadArtistNames() async {
+    final artists = await ArtistDao.instance.getAll();
+    if (!mounted) return;
+    setState(() {
+      _artistNames = {
+        for (final a in artists)
+          if (a.id != null) a.id!: a.artisticName,
+      };
+    });
   }
 
   String _formatarDuracao(int segundosTotais) {
-    int minutos = segundosTotais ~/ 60;
-    int segundos = segundosTotais % 60;
-    String segundosStr = segundos.toString().padLeft(2, '0');
-    return "$minutos:$segundosStr";
+    final minutos = segundosTotais ~/ 60;
+    final segundos = (segundosTotais % 60).toString().padLeft(2, '0');
+    return '$minutos:$segundos';
   }
 
-  Widget _construirImagemCapa(String path) {
-    if (path.isEmpty) {
-      return Container(
-        width: 55,
-        height: 55,
-        color: Colors.grey[800],
-        child: const Icon(Icons.music_note, color: Colors.white),
-      );
-    }
-
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return Image.network(
-        path,
-        width: 55,
-        height: 55,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _iconeErro(),
-      );
-    } else {
-      return Image.file(
-        File(path),
-        width: 55,
-        height: 55,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _iconeErro(),
-      );
-    }
+  Future<void> _toggleFavorite(Song song) async {
+    setState(() {
+      song.isFavorite = !song.isFavorite;
+    });
+    await SongDao.instance.update(song);
+    widget.onFavoriteChanged?.call();
   }
 
-  Widget _iconeErro() {
-    return Container(
-      width: 55,
-      height: 55,
-      color: Colors.grey[800],
-      child: const Icon(Icons.broken_image, color: Colors.white),
+  Future<void> _playSingle(Song song) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+
+    if (!File(song.audioPath).existsSync()) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Arquivo de áudio não encontrado. Edite a música e escolha o áudio novamente.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Tocando: ${song.title}'),
+        duration: const Duration(seconds: 2),
+      ),
     );
+
+    try {
+      await appAudio.play(DeviceFileSource(song.audioPath));
+    } catch (e) {
+      debugPrint('Erro ao tocar música: $e');
+    }
+  }
+
+  Future<void> _onAction(_SongAction action, Song song) async {
+    switch (action) {
+      case _SongAction.addToPlaylist:
+        await showAddToPlaylistSheet(context, song);
+        break;
+
+      case _SongAction.removeFromPlaylist:
+        if (widget.playlistId == null || song.id == null) return;
+        await PlaylistSongDao.instance
+            .removeSongFromPlaylist(widget.playlistId!, song.id!);
+        widget.onRemovedFromPlaylist?.call();
+        break;
+
+      case _SongAction.edit:
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => AddSong(song: song)),
+        );
+        widget.onSongUpdated?.call();
+        break;
+
+      case _SongAction.delete:
+        final confirmed = await confirmDialog(
+          context,
+          title: 'Excluir música',
+          message: 'Deseja excluir "${song.title}"? Ela também sairá das playlists.',
+        );
+        if (!confirmed) return;
+        await SongDao.instance.remove(song);
+        widget.onSongDeleted?.call();
+        break;
+    }
+  }
+
+  List<PopupMenuEntry<_SongAction>> _menuItems() {
+    PopupMenuItem<_SongAction> item(
+      _SongAction value,
+      IconData icon,
+      String label, {
+      Color? color,
+    }) {
+      return PopupMenuItem(
+        value: value,
+        child: Row(
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(width: 12),
+            Text(label),
+          ],
+        ),
+      );
+    }
+
+    return [
+      item(_SongAction.addToPlaylist, Icons.playlist_add, 'Adicionar à playlist'),
+      if (widget.playlistId != null)
+        item(_SongAction.removeFromPlaylist, Icons.playlist_remove,
+            'Remover da playlist'),
+      if (widget.showEditButton)
+        item(_SongAction.edit, Icons.edit, 'Editar', color: Colors.blue),
+      if (widget.showDeleteButton)
+        item(_SongAction.delete, Icons.delete, 'Excluir', color: Colors.red),
+    ];
   }
 
   @override
@@ -98,18 +201,23 @@ class _SongListWidgetState extends State<SongListWidget> {
       itemCount: widget.songs.length,
       itemBuilder: (context, index) {
         final song = widget.songs[index];
+        final isPlaying =
+            widget.playingSongId != null && widget.playingSongId == song.id;
+        final artistName = _artistNames[song.idArtist] ?? 'Artista desconhecido';
 
         return Card(
           elevation: 2,
           margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
           child: ListTile(
+            selected: isPlaying,
             contentPadding: const EdgeInsets.all(8.0),
-            leading: ClipRRect(
-              borderRadius: BorderRadius.circular(8.0),
-              child: _construirImagemCapa(song.imagePath),
-            ),
+            leading: AppImage(path: song.imagePath, size: 55),
             title: Row(
               children: [
+                if (isPlaying) ...[
+                  const Icon(Icons.graphic_eq, size: 18),
+                  const SizedBox(width: 6),
+                ],
                 Expanded(
                   child: Text(
                     song.title,
@@ -124,76 +232,24 @@ class _SongListWidgetState extends State<SongListWidget> {
                     song.isFavorite ? Icons.favorite : Icons.favorite_border,
                     color: song.isFavorite ? Colors.red : Colors.grey,
                   ),
-                  onPressed: () {
-                    setState(() {
-                      song.isFavorite = !song.isFavorite;
-                    });
-                    SongDao.instance.update(song);
-                  },
+                  onPressed: () => _toggleFavorite(song),
                 ),
               ],
             ),
-            subtitle: FutureBuilder<Artist?>(
-              future: ArtistDao.instance.getById(song.idArtist),
-              builder: (context, artistSnapshot) {
-                String nomeArtista = "Carregando...";
-                if (artistSnapshot.connectionState == ConnectionState.done) {
-                  if (artistSnapshot.hasData && artistSnapshot.data != null) {
-                    nomeArtista = artistSnapshot.data!.artisticName;
-                  } else {
-                    nomeArtista = "Artista desconhecido";
-                  }
-                }
-                
-                // Formatando a duração aqui com a nova função
-                String duracaoFormatada = _formatarDuracao(song.duration);
-
-                return Text("$nomeArtista • $duracaoFormatada");
-              },
+            subtitle: Text(
+              "$artistName • ${_formatarDuracao(song.duration)}",
+              overflow: TextOverflow.ellipsis,
             ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (widget.showEditButton)
-                  IconButton(
-                    icon: const Icon(Icons.edit, color: Colors.blue),
-                    onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AddSong(song: song),
-                        ),
-                      );
-                      if (widget.onSongUpdated != null) {
-                        widget.onSongUpdated!();
-                      }
-                    },
-                  ),
-                if (widget.showDeleteButton)
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () async {
-                      await SongDao.instance.remove(song);
-                      if (widget.onSongDeleted != null) {
-                        widget.onSongDeleted!();
-                      }
-                    },
-                  ),
-              ],
+            trailing: PopupMenuButton<_SongAction>(
+              onSelected: (action) => _onAction(action, song),
+              itemBuilder: (_) => _menuItems(),
             ),
-            onTap: () async {
-              ScaffoldMessenger.of(context).clearSnackBars();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text("Tocando: ${song.title}"),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-
-              try {
-                await _audioPlayer.play(DeviceFileSource(song.audioPath));
-              } catch (e) {
-                print("Erro ao tocar música: $e");
+            onTap: () {
+              final onTap = widget.onSongTap;
+              if (onTap != null) {
+                onTap(index);
+              } else {
+                _playSingle(song);
               }
             },
           ),

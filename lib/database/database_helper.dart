@@ -7,7 +7,7 @@ class DatabaseHelper {
 
   static Database? _database;
 
-  static const int _version = 2;
+  static const int _version = 1;
   static const String _dbName = 'owari_db.db';
 
   Future<Database> get database async => _database ??= await _initDatabase();
@@ -20,7 +20,6 @@ class DatabaseHelper {
       version: _version,
       onConfigure: _onConfigure,
       onCreate: _createDb,
-      onUpgrade: _onUpgrade,
     );
   }
 
@@ -77,16 +76,11 @@ class DatabaseHelper {
       CREATE TABLE playlist_songs(
         playlistId INTEGER NOT NULL,
         songId INTEGER NOT NULL,
+        position INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (playlistId, songId),
         FOREIGN KEY (playlistId) REFERENCES playlists (id) ON DELETE CASCADE,
         FOREIGN KEY (songId) REFERENCES songs (id) ON DELETE CASCADE
       )
     ''');
-  }
-
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 3) {
-      await db.execute('ALTER TABLE artists ADD COLUMN description TEXT;');
-    }
   }
 }

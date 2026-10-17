@@ -7,10 +7,10 @@ class FavoriteSongs extends StatefulWidget {
   const FavoriteSongs({super.key});
 
   @override
-  State<FavoriteSongs> createState() => _LibrarySongState();
+  State<FavoriteSongs> createState() => _FavoriteSongsState();
 }
 
-class _LibrarySongState extends State<FavoriteSongs> {
+class _FavoriteSongsState extends State<FavoriteSongs> {
   late Future<List<Song>> _songsFuture;
 
   @override
@@ -20,15 +20,14 @@ class _LibrarySongState extends State<FavoriteSongs> {
   }
 
   void _carregarMusicas() {
- 
-    _songsFuture = SongDao.instance.getFavorites(); 
+    _songsFuture = SongDao.instance.getFavorites();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-      title: Text("Your Favorites"),
+        title: const Text("Your Favorites"),
       ),
       body: FutureBuilder<List<Song>>(
         future: _songsFuture,
@@ -43,8 +42,14 @@ class _LibrarySongState extends State<FavoriteSongs> {
 
           final songs = snapshot.data!;
 
-          
-          return SongListWidget(songs: songs);
+          return SongListWidget(
+            songs: songs,
+            onFavoriteChanged: () {
+              setState(() {
+                _carregarMusicas();
+              });
+            },
+          );
         },
       ),
     );

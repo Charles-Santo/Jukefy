@@ -19,6 +19,8 @@ class _AddArtistState extends State<AddArtist> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _imagePathController = TextEditingController();
 
+  bool _saving = false;
+
   @override
   void initState() {
     super.initState();
@@ -40,6 +42,44 @@ class _AddArtistState extends State<AddArtist> {
       setState(() {
         _imagePathController.text = resultado.files.single.path!;
       });
+    }
+  }
+
+  Future<void> _salvar() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _saving = true);
+    try {
+      final imagePath = _imagePathController.text.trim();
+
+      Artist artist = Artist(
+        id: widget.artist?.id,
+        name: _nameController.text.trim(),
+        artisticName: _artisticNameController.text.trim(),
+        description: _descriptionController.text.trim(),
+        imagePath: imagePath,
+      );
+
+      if (widget.artist == null) {
+        await ArtistDao.instance.add(artist);
+      } else {
+        await ArtistDao.instance.update(artist);
+      }
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Artista salvo com sucesso!")),
+      );
+
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Erro ao salvar: $e")),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -71,7 +111,6 @@ class _AddArtistState extends State<AddArtist> {
                   },
                 ),
                 const SizedBox(height: 10),
-
                 TextFormField(
                   controller: _artisticNameController,
                   decoration: const InputDecoration(labelText: "Nome Artístico"),
@@ -83,28 +122,21 @@ class _AddArtistState extends State<AddArtist> {
                   },
                 ),
                 const SizedBox(height: 10),
-
                 TextFormField(
                   controller: _descriptionController,
-                  decoration: const InputDecoration(labelText: "Descrição / Biografia"),
+                  decoration:
+                      const InputDecoration(labelText: "Descrição / Biografia"),
                   maxLines: 3,
                 ),
                 const SizedBox(height: 10),
-
                 Row(
                   children: [
                     Expanded(
                       child: TextFormField(
                         controller: _imagePathController,
                         decoration: const InputDecoration(
-                          labelText: "Caminho da Imagem (URL ou Local)",
+                          labelText: "Imagem (opcional - URL ou Local)",
                         ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Informe ou selecione a imagem';
-                          }
-                          return null;
-                        },
                       ),
                     ),
                     IconButton(
@@ -119,36 +151,15 @@ class _AddArtistState extends State<AddArtist> {
                   ],
                 ),
                 const SizedBox(height: 20),
-
                 ElevatedButton(
-                  onPressed: () async {
-                    if (_formKey.currentState!.validate()) {
-                      Artist artist = Artist(
-                        id: widget.artist?.id,
-                        name: _nameController.text,
-                        artisticName: _artisticNameController.text,
-                        description: _descriptionController.text,
-                        imagePath: _imagePathController.text,
-                      );
-
-                      if (widget.artist == null) {
-                        await ArtistDao.instance.add(artist);
-                      } else {
-                        await ArtistDao.instance.update(artist);
-                      }
-
-                      if (!context.mounted) return;
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Artista salvo com sucesso!"),
-                        ),
-                      );
-
-                      Navigator.pop(context);
-                    }
-                  },
-                  child: const Text("Salvar"),
+                  onPressed: _saving ? null : _salvar,
+                  child: _saving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text("Salvar"),
                 ),
               ],
             ),
