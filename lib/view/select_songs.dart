@@ -6,7 +6,6 @@ import 'package:Jukefy/model/playlist.dart';
 import 'package:Jukefy/model/song.dart';
 import 'package:Jukefy/widgets/app_image.dart';
 
-/// Escolhe músicas (que ainda não estão na playlist) para adicionar.
 class SelectSongs extends StatefulWidget {
   final Playlist playlist;
   const SelectSongs({super.key, required this.playlist});

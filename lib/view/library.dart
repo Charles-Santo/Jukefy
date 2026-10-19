@@ -14,7 +14,6 @@ class _LibraryData {
   _LibraryData(this.playlists, this.counts);
 }
 
-/// Aba Library: playlists do usuário logado.
 class Library extends StatefulWidget {
   const Library({super.key});
 

@@ -10,7 +10,6 @@ import 'package:Jukefy/widgets/confirm_dialog.dart';
 class PlaylistListWidget extends StatelessWidget {
   final List<Playlist> playlists;
 
-  /// {playlistId: quantidade de músicas}
   final Map<int, int> counts;
   final VoidCallback onChanged;
 

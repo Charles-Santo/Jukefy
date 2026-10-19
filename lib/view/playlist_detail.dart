@@ -14,8 +14,6 @@ import 'package:Jukefy/view/select_songs.dart';
 import 'package:Jukefy/widgets/app_image.dart';
 import 'package:Jukefy/widgets/song_list_widget.dart';
 
-/// Músicas de uma playlist. "Tocar" executa todas, uma após a outra,
-/// na mesma ordem em que a playlist foi montada.
 class PlaylistDetail extends StatefulWidget {
   final Playlist playlist;
   const PlaylistDetail({super.key, required this.playlist});

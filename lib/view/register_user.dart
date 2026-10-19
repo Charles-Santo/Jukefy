@@ -6,7 +6,6 @@ import 'package:Jukefy/model/user.dart';
 import 'package:Jukefy/session.dart';
 import 'package:Jukefy/widgets/app_image.dart';
 
-/// Cadastro de usuário. Se [user] for informado, vira edição de perfil.
 class RegisterUserPage extends StatefulWidget {
   final User? user;
   const RegisterUserPage({super.key, this.user});
@@ -102,7 +101,6 @@ class _RegisterUserPageState extends State<RegisterUserPage> {
           _showMessage(error);
           return;
         }
-        // Usuário já está logado: volta à raiz (o AuthGate mostra a Homepage).
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {

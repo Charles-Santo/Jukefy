@@ -94,16 +94,6 @@ class _SongListWidgetState extends State<SongListWidget> {
     final messenger = ScaffoldMessenger.of(context);
     messenger.clearSnackBars();
 
-    if (!File(song.audioPath).existsSync()) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Arquivo de áudio não encontrado. Edite a música e escolha o áudio novamente.',
-          ),
-        ),
-      );
-      return;
-    }
 
     messenger.showSnackBar(
       SnackBar(

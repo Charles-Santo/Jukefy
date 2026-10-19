@@ -153,7 +153,7 @@ class ConteudoHome extends StatelessWidget {
         const SizedBox(height: 12),
         OptionCard(
           title: 'Your Favorites',
-          subtitle: 'Songs you love',
+          subtitle: 'Songs you like',
           icon: Icons.star,
           onTap: () async {
             await Navigator.push(
